@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sequence Explorer</title>
+<style>
+  :root {
+    --blue: #2563EB;
+    --blue-dark: #1D4ED8;
+    --orange: #EA580C;
+    --orange-light: #FFF1E8;
+    --purple: #7C3AED;
+    --purple-light: #F3EEFF;
+    --ink: #1E293B;
+    --muted: #64748B;
+    --bg: #F1F5F9;
+    --card: #FFFFFF;
+    --border: #E2E8F0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .app {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  header h1 {
+    margin: 0 0 4px;
+    font-size: 1.6rem;
+    color: var(--ink);
+  }
+  header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  /* --- Tabs --- */
+  .tabs {
+    display: flex;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 14px 10px;
+    border: none;
+    background: #F8FAFC;
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab-btn:hover { background: #EEF2F7; }
+  .tab-btn.active {
+    background: var(--card);
+    color: var(--blue);
+    border-bottom: 3px solid var(--blue);
+  }
+
+  .tab-content { padding: 20px; }
+  .tab-content[hidden] { display: none; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .field label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .field input[type="number"] {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: #FBFCFD;
+    color: var(--ink);
+    font-family: inherit;
+  }
+  .field input[type="number"]:focus {
+    outline: none;
+    border-color: var(--blue);
+    background: #fff;
+  }
+  .field input.invalid,
+  .field input.invalid:focus {
+    border-color: #DC2626;
+    background: #FEF2F2;
+  }
+
+  .op-toggle {
+    display: flex;
+    gap: 8px;
+  }
+  .op-btn {
+    flex: 1;
+    padding: 10px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: #FBFCFD;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.12s;
+  }
+  .op-btn[data-op="add"].selected {
+    background: var(--orange-light);
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+  .op-btn[data-op="mul"].selected {
+    background: var(--purple-light);
+    border-color: var(--purple);
+    color: var(--purple);
+  }
+
+  .formula-preview {
+    background: #F8FAFC;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 1.05rem;
+    color: var(--ink);
+    font-family: "Cambria Math", Cambria, "Times New Roman", serif;
+    min-height: 1.3em;
+  }
+  .warn {
+    margin-top: 8px;
+    font-size: 0.82rem;
+    color: #B45309;
+  }
+
+  /* --- Output panel --- */
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .output-header h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .legend-dot {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .output-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 0;
+  }
+  @media (max-width: 680px) {
+    .output-grid { grid-template-columns: 1fr; }
+  }
+  .table-wrap {
+    padding: 16px;
+    border-right: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  @media (max-width: 680px) {
+    .table-wrap { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: center;
+  }
+  thead th {
+    background: #F1F5F9;
+    color: var(--ink);
+    font-weight: 700;
+    border-bottom: 2px solid var(--border);
+  }
+  tbody tr:nth-child(even) { background: #FAFBFC; }
+  tbody td { border-bottom: 1px solid var(--border); }
+
+  .graph-wrap {
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+  }
+  canvas#seq-canvas {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Sequence Explorer</h1>
+    <p>Build a sequence recursively or with an explicit formula, then see it as a table and a graph.</p>
+  </header>
+
+  <!-- PANEL 1: input, two tabs -->
+  <div class="panel" id="input-panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="recursive" type="button">Recursive Definition</button>
+      <button class="tab-btn" data-tab="explicit" type="button">Explicit Formula</button>
+    </div>
+
+    <div class="tab-content" id="tab-recursive">
+      <div class="form-grid">
+        <div class="field">
+          <label for="recur-a1">First Term (a&#8321;)</label>
+          <input type="number" id="recur-a1" value="5" step="any">
+        </div>
+        <div class="field">
+          <label>Rule</label>
+          <div class="op-toggle" data-group="recur-op">
+            <button type="button" class="op-btn selected" data-op="add">&plus;</button>
+            <button type="button" class="op-btn" data-op="mul">&times;</button>
+          </div>
+        </div>
+        <div class="field">
+          <label id="recur-value-label" for="recur-value">Common Difference</label>
+          <input type="number" id="recur-value" value="3" step="any">
+        </div>
+        <div class="field">
+          <label for="recur-terms">Number of Terms</label>
+          <input type="number" id="recur-terms" value="8" min="1" max="20" step="1">
+        </div>
+      </div>
+      <div class="formula-preview" id="recur-formula"></div>
+      <div class="warn" id="recur-warn" style="display:none;"></div>
+    </div>
+
+    <div class="tab-content" id="tab-explicit" hidden>
+      <div class="form-grid">
+        <div class="field">
+          <label for="expl-a1">First Term (a&#8321;)</label>
+          <input type="number" id="expl-a1" value="5" step="any">
+        </div>
+        <div class="field">
+          <label>Rule</label>
+          <div class="op-toggle" data-group="expl-op">
+            <button type="button" class="op-btn selected" data-op="add">&plus;</button>
+            <button type="button" class="op-btn" data-op="mul">&times;</button>
+          </div>
+        </div>
+        <div class="field">
+          <label id="expl-value-label" for="expl-value">Common Difference</label>
+          <input type="number" id="expl-value" value="3" step="any">
+        </div>
+        <div class="field">
+          <label for="expl-terms">Number of Terms</label>
+          <input type="number" id="expl-terms" value="8" min="1" max="20" step="1">
+        </div>
+      </div>
+      <div class="formula-preview" id="expl-formula"></div>
+      <div class="warn" id="expl-warn" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- PANEL 2: table + graph -->
+  <div class="panel" id="output-panel">
+    <div class="output-header">
+      <h2>Table &amp; Graph</h2>
+      <span><span class="legend-dot" id="legend-dot"></span><span id="legend-label">Arithmetic Sequence</span></span>
+    </div>
+    <div class="output-grid">
+      <div class="table-wrap">
+        <table id="seq-table">
+          <thead><tr><th>Term (n)</th><th>Value (a&#8345;)</th></tr></thead>
+          <tbody id="seq-table-body"></tbody>
+        </table>
+      </div>
+      <div class="graph-wrap">
+        <canvas id="seq-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <footer>Made for Algebra 1 &mdash; enter numbers above and the table and graph update automatically.</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var activeMode = "recursive";
+
+  var COLORS = {
+    add: "#EA580C",
+    mul: "#7C3AED"
+  };
+  var LEGEND = {
+    add: "Arithmetic Sequence",
+    mul: "Geometric Sequence"
+  };
+
+  function $(id) { return document.getElementById(id); }
+
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function readNumber(input, fallback) {
+    var v = parseFloat(input.value);
+    if (isNaN(v)) {
+      input.classList.add("invalid");
+      return fallback;
+    }
+    input.classList.remove("invalid");
+    return v;
+  }
+
+  function readTerms(input) {
+    var v = parseInt(input.value, 10);
+    if (isNaN(v)) v = 8;
+    v = clamp(v, 1, 20);
+    if (String(v) !== input.value) input.value = v;
+    input.classList.remove("invalid");
+    return v;
+  }
+
+  function getOp(groupEl) {
+    var sel = groupEl.querySelector(".op-btn.selected");
+    return sel ? sel.getAttribute("data-op") : "add";
+  }
+
+  function fmtNum(n) {
+    if (Object.is(n, -0)) n = 0;
+    var r = Math.round(n * 1000) / 1000;
+    return r.toString();
+  }
+
+  function fmtSigned(n, symbol) {
+    if (n < 0) return "&minus; " + fmtNum(Math.abs(n));
+    return symbol + " " + fmtNum(n);
+  }
+
+  function getModeConfig(mode) {
+    var prefix = mode === "recursive" ? "recur" : "expl";
+    var a1input = $(prefix + "-a1");
+    var valueInput = $(prefix + "-value");
+    var termsInput = $(prefix + "-terms");
+    var opGroup = document.querySelector('.op-toggle[data-group="' + prefix + '-op"]');
+    var op = getOp(opGroup);
+
+    var a1 = readNumber(a1input, 0);
+    var value = readNumber(valueInput, op === "add" ? 0 : 1);
+    var terms = readTerms(termsInput);
+
+    return { prefix: prefix, a1: a1, op: op, value: value, terms: terms };
+  }
+
+  function computeSequence(cfg) {
+    var data = [];
+    if (activeModeIsRecursive(cfg)) {
+      var current = cfg.a1;
+      for (var n = 1; n <= cfg.terms; n++) {
+        if (n === 1) {
+          data.push({ n: n, v: cfg.a1 });
+          current = cfg.a1;
+        } else {
+          current = cfg.op === "add" ? current + cfg.value : current * cfg.value;
+          data.push({ n: n, v: current });
+        }
+      }
+    } else {
+      for (var n2 = 1; n2 <= cfg.terms; n2++) {
+        var v;
+        if (cfg.op === "add") {
+          v = cfg.a1 + cfg.value * (n2 - 1);
+        } else {
+          v = cfg.a1 * Math.pow(cfg.value, n2 - 1);
+        }
+        data.push({ n: n2, v: v });
+      }
+    }
+    return data;
+  }
+
+  // small helper since computeSequence is shared, tag which formula style to use
+  function activeModeIsRecursive(cfg) {
+    return cfg.__mode === "recursive";
+  }
+
+  function updateFormulaPreview(mode, cfg) {
+    var target = $(mode === "recursive" ? "recur-formula" : "expl-formula");
+    var warnTarget = $(mode === "recursive" ? "recur-warn" : "expl-warn");
+    var a1 = fmtNum(cfg.a1);
+
+    if (mode === "recursive") {
+      var opText = cfg.op === "add"
+        ? "a&#8345; = a&#8345;&#8331;&#8321; " + fmtSigned(cfg.value, "+")
+        : "a&#8345; = a&#8345;&#8331;&#8321; &times; " + (cfg.value < 0 ? "(" + fmtNum(cfg.value) + ")" : fmtNum(cfg.value));
+      target.innerHTML = "a&#8321; = " + a1 + ",&nbsp;&nbsp; " + opText + "  (n &gt; 1)";
+    } else {
+      var formula;
+      if (cfg.op === "add") {
+        formula = "a&#8345; = " + a1 + " " + fmtSigned(cfg.value, "+") + "(n &minus; 1)";
+      } else {
+        var base = cfg.value < 0 ? "(" + fmtNum(cfg.value) + ")" : fmtNum(cfg.value);
+        formula = "a&#8345; = " + a1 + " &times; " + base + "<sup>(n&minus;1)</sup>";
+      }
+      target.innerHTML = formula;
+    }
+
+    if (cfg.op === "mul" && cfg.value === 0) {
+      warnTarget.style.display = "block";
+      warnTarget.textContent = "With a ratio of 0, every term after the first becomes 0.";
+    } else {
+      warnTarget.style.display = "none";
+    }
+  }
+
+  function updateValueLabel(mode, op) {
+    var label = $(mode === "recursive" ? "recur-value-label" : "expl-value-label");
+    label.textContent = op === "add" ? "Common Difference" : "Common Ratio";
+  }
+
+  function renderTable(data) {
+    var body = $("seq-table-body");
+    var rows = data.map(function (d) {
+      return "<tr><td>" + d.n + "</td><td>" + fmtNum(d.v) + "</td></tr>";
+    });
+    body.innerHTML = rows.join("");
+  }
+
+  function niceNum(range, round) {
+    if (range === 0) range = 1;
+    var exponent = Math.floor(Math.log(range) / Math.LN10);
+    var fraction = range / Math.pow(10, exponent);
+    var niceFraction;
+    if (round) {
+      if (fraction < 1.5) niceFraction = 1;
+      else if (fraction < 3) niceFraction = 2;
+      else if (fraction < 7) niceFraction = 5;
+      else niceFraction = 10;
+    } else {
+      if (fraction <= 1) niceFraction = 1;
+      else if (fraction <= 2) niceFraction = 2;
+      else if (fraction <= 5) niceFraction = 5;
+      else niceFraction = 10;
+    }
+    return niceFraction * Math.pow(10, exponent);
+  }
+
+  function niceScale(min, max, maxTicks) {
+    if (min === max) { min -= 1; max += 1; }
+    var range = niceNum(max - min, false);
+    var step = niceNum(range / (maxTicks - 1), true);
+    var niceMin = Math.floor(min / step) * step;
+    var niceMax = Math.ceil(max / step) * step;
+    return { min: niceMin, max: niceMax, step: step };
+  }
+
+  function drawGraph(data, color) {
+    var canvas = $("seq-canvas");
+    var wrap = canvas.parentElement;
+    var cssWidth = Math.max(280, wrap.clientWidth);
+    var cssHeight = 320;
+    var dpr = window.devicePixelRatio || 1;
+
+    canvas.style.width = cssWidth + "px";
+    canvas.style.height = cssHeight + "px";
+    canvas.width = cssWidth * dpr;
+    canvas.height = cssHeight * dpr;
+
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    var padLeft = 56, padRight = 20, padTop = 18, padBottom = 46;
+    var plotW = cssWidth - padLeft - padRight;
+    var plotH = cssHeight - padTop - padBottom;
+
+    var nMax = data.length;
+    var vals = data.map(function (d) { return d.v; });
+    var vMin = Math.min.apply(null, vals);
+    var vMax = Math.max.apply(null, vals);
+    var yScale = niceScale(vMin, vMax, 5);
+
+    var xMinVal = 0.5;
+    var xMaxVal = nMax + 0.5;
+
+    function xToPx(n) {
+      return padLeft + ((n - xMinVal) / (xMaxVal - xMinVal)) * plotW;
+    }
+    function yToPx(v) {
+      return padTop + plotH - ((v - yScale.min) / (yScale.max - yScale.min)) * plotH;
+    }
+
+    // gridlines - y
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "#64748B";
+    ctx.font = "11px -apple-system, sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+
+    for (var yv = yScale.min; yv <= yScale.max + 1e-9; yv += yScale.step) {
+      var py = yToPx(yv);
+      ctx.beginPath();
+      ctx.moveTo(padLeft, py);
+      ctx.lineTo(padLeft + plotW, py);
+      ctx.stroke();
+      ctx.fillText(fmtNum(Math.round(yv * 1000) / 1000), padLeft - 8, py);
+    }
+
+    // gridlines - x (integer terms)
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    var xStep = 1;
+    if (nMax > 12) xStep = 2;
+    if (nMax > 20) xStep = 5;
+    for (var n = 1; n <= nMax; n += xStep) {
+      var px = xToPx(n);
+      ctx.beginPath();
+      ctx.moveTo(px, padTop);
+      ctx.lineTo(px, padTop + plotH);
+      ctx.stroke();
+      ctx.fillText(String(n), px, padTop + plotH + 8);
+    }
+
+    // axes
+    ctx.strokeStyle = "#94A3B8";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(padLeft, padTop);
+    ctx.lineTo(padLeft, padTop + plotH);
+    ctx.lineTo(padLeft + plotW, padTop + plotH);
+    ctx.stroke();
+
+    // axis titles
+    ctx.fillStyle = "#334155";
+    ctx.font = "bold 12px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("Term (n)", padLeft + plotW / 2, cssHeight - 6);
+
+    ctx.save();
+    ctx.translate(14, padTop + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("Value", 0, 0);
+    ctx.restore();
+
+    // points
+    ctx.fillStyle = color;
+    data.forEach(function (d) {
+      var px = xToPx(d.n);
+      var py = yToPx(d.v);
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  function render() {
+    var mode = activeMode;
+    var cfg = getModeConfig(mode);
+    cfg.__mode = mode;
+
+    updateValueLabel(mode, cfg.op);
+    updateFormulaPreview(mode, cfg);
+
+    var data = computeSequence(cfg);
+    renderTable(data);
+    drawGraph(data, COLORS[cfg.op]);
+
+    $("legend-dot").style.background = COLORS[cfg.op];
+    $("legend-label").textContent = LEGEND[cfg.op];
+  }
+
+  // --- wire up tabs ---
+  document.querySelectorAll(".tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      var tab = btn.getAttribute("data-tab");
+      activeMode = tab;
+      $("tab-recursive").hidden = tab !== "recursive";
+      $("tab-explicit").hidden = tab !== "explicit";
+      render();
+    });
+  });
+
+  // --- wire up op toggle buttons ---
+  document.querySelectorAll(".op-toggle").forEach(function (group) {
+    group.querySelectorAll(".op-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        group.querySelectorAll(".op-btn").forEach(function (b) { b.classList.remove("selected"); });
+        btn.classList.add("selected");
+        var prefix = group.getAttribute("data-group").split("-")[0];
+        updateValueLabel(prefix === "recur" ? "recursive" : "explicit", btn.getAttribute("data-op"));
+        render();
+      });
+    });
+  });
+
+  // --- wire up number inputs ---
+  ["recur-a1", "recur-value", "recur-terms", "expl-a1", "expl-value", "expl-terms"].forEach(function (id) {
+    $(id).addEventListener("input", render);
+    $(id).addEventListener("change", render);
+  });
+
+  window.addEventListener("resize", render);
+
+  render();
+})();
+</script>
+</body>
+</html>
